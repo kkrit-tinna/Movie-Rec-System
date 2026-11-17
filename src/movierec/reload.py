@@ -16,7 +16,7 @@ report is missing, empty or shows a failed gate.
 
 Limit: it overwrites items but does not delete items missing from the older
 run, so a film added since then stays in the table. That is harmless while the
-catalog is frozen (IMPLEMENTATION.md §3).
+catalog is frozen (IMPLEMENTATION.md §3 at tag v2.0).
 """
 import argparse
 import io

@@ -2,7 +2,7 @@
 
 document = title + tagline + overview + genres, space-joined, lowercased.
 Never add keywords here -- they are the held-out label for Keyword
-Jaccard@10 (see IMPLEMENTATION.md T1.3 and T2.3).
+Jaccard@10 (see IMPLEMENTATION.md T1.3 and T2.3 at tag v2.0).
 """
 import argparse
 import time

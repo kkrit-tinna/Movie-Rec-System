@@ -1,7 +1,7 @@
 """TF-IDF embedder for T1.4.
 
 Wraps sklearn's TfidfVectorizer with every parameter read from the `tfidf`
-block in config/default.yaml -- see IMPLEMENTATION.md T1.4.
+block in config/default.yaml -- see IMPLEMENTATION.md T1.4 at tag v2.0.
 """
 import argparse
 import io

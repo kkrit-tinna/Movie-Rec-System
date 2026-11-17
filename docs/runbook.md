@@ -321,7 +321,7 @@ The site is safe: a failed gate stops the run before anything is loaded.
 2. **Check what changed upstream.** Look at the [Kaggle dataset](https://www.kaggle.com/datasets/asaniczka/tmdb-movies-dataset-2023-930k-movies). Common causes are a truncated download, a changed column, or a real jump in rows.
 3. **Decide.**
    - **A temporary upstream problem:** wait, then rerun (section 2). A rerun on the same date overwrites the report.
-   - **The data really changed and is good:** adjust the threshold in `config/default.yaml`, with a dated line in `IMPLEMENTATION.md` §9 saying why. The config is baked into the image, so this needs a new image (section 6).
+   - **The data really changed and is good:** adjust the threshold in `config/default.yaml`, with a dated line in `IMPLEMENTATION_V3.md` §7 saying why. The config is baked into the image, so this needs a new image (section 6).
    - **The data is bad:** leave the previous run serving. If the next scheduled run would fail too, that's only more emails, since the gates protect the table.
 
 **Never bypass a gate.** Don't remove one, don't override it to get a run through, and don't reload a run that failed one. `movierec.reload` refuses those.

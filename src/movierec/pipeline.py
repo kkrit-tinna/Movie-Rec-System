@@ -1,4 +1,4 @@
-"""Batch entrypoint for T4.3: the eight steps of IMPLEMENTATION.md §2, in order.
+"""Batch entrypoint for T4.3: the eight steps of IMPLEMENTATION.md §2 at tag v2.0, in order.
 
 1 ingest -> 2 data gates -> 3 fit TF-IDF + Word2Vec, embedding gates ->
 4 top-K neighbours -> 5 evaluate -> 6 write artifacts -> 7 DynamoDB ->

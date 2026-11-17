@@ -43,3 +43,8 @@ run_*.log
 crash.log
 *.tfvars
 *.tfplan
+
+
+# Ignore v2 guide & handoff
+IMPLEMENTATION_V2.md
+HANDOFF_V2.md

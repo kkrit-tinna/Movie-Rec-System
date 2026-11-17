@@ -1,7 +1,7 @@
 """Word2Vec embedder for T2.1.
 
 Document vector = IDF-weighted mean of the document's GloVe word vectors,
-L2-normalised and stored as float16 -- see IMPLEMENTATION.md T2.1.
+L2-normalised and stored as float16 -- see IMPLEMENTATION.md T2.1 at tag v2.0.
 
 The IDF map is passed in rather than taken from a TfidfEmbedder, so the two
 embedders stay interchangeable. It must hold unigram keys only; the caller

@@ -1,4 +1,4 @@
-"""Data quality gates for T1.6 (see IMPLEMENTATION.md T1.6).
+"""Data quality gates for T1.6 (see IMPLEMENTATION.md T1.6 at tag v2.0).
 
 Each gate is a pure function: given the data it checks plus the `quality`
 block from config/default.yaml, it returns a GateResult. Nothing here

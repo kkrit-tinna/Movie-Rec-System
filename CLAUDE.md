@@ -1,6 +1,6 @@
-# movierec v2
+# movierec
 Content-based movie recommender. Batch job precomputes top-10 neighbours;
-serving is a key lookup. `IMPLEMENTATION.md` is the source of truth —
+serving is a key lookup. `IMPLEMENTATION_V3.md` is the source of truth —
 read the relevant `T#.#` block before starting work.
 
 ## Session rules
@@ -8,7 +8,7 @@ read the relevant `T#.#` block before starting work.
   passes. Do not begin the next task.
 - Do not start a task whose **Depends on** is not yet committed.
 - If the real data disagrees with the guide (missing column, different
-  count), update the guide in the same commit and add today's line to §9.
+  count), update the guide in the same commit and add today's line to §7.
   Do not work around it silently.
 
 ## Hard constraint
@@ -45,7 +45,7 @@ chose GloVe without renaming it, and Phase 3 (the only real Word2Vec, a
 from-scratch model in T3.3/T3.4) was dropped on Sep 15. The identifier
 rename is in the v3 plan.
 Rules:
-1. In anything a reader sees (README, docs/, IMPLEMENTATION.md prose, the
+1. In anything a reader sees (README, docs/, IMPLEMENTATION_V3.md prose, the
    page, commit messages, summaries, resume text), call it "GloVe" or
    "pretrained GloVe embeddings". Never "Word2Vec".
 2. Never describe pretrained embeddings as "fit" or "trained".
@@ -53,5 +53,5 @@ Rules:
    when touching one, note it in the rename backlog item.
 4. When an implementation choice changes what a spec name refers to, or
    the work that justified a name is dropped, rename it or log the
-   mismatch in §9 the SAME day. A name must describe what was built,
+   mismatch in §7 the SAME day. A name must describe what was built,
    not what was planned.

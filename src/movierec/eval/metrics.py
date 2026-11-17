@@ -7,7 +7,7 @@ list, not editing `run_comparison`.
 
 T2.3: scores an existing run -- it never refits. Loads each method's
 `{method}/{run_date}/neighbours.parquet`, adds a seeded random baseline, and
-writes `comparison/{run_date}/metrics.json`. See IMPLEMENTATION.md T2.3.
+writes `comparison/{run_date}/metrics.json`. See IMPLEMENTATION.md T2.3 at tag v2.0.
 """
 import argparse
 import io

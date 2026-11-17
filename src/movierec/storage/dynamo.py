@@ -1,7 +1,7 @@
 """DynamoDB item builder, batch writer (T4.2b) and reader (T4.4a).
 
 build_items() is pure: catalog + neighbour frames in, plain Python items out,
-shaped as in IMPLEMENTATION.md §7. DynamoWriter() sends those items to the
+shaped as in IMPLEMENTATION.md §7 at tag v2.0. DynamoWriter() sends those items to the
 `movies` table with BatchWriteItem, 25 per call, retrying UnprocessedItems
 with exponential backoff and full jitter. DynamoReader() serves the API:
 GetItem for one movie, BatchGetItem (100 keys per call, UnprocessedKeys

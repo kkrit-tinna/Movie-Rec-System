@@ -1,7 +1,7 @@
 """Throwaway data-profiling script for T1.1. Not committed.
 
 Reads data/raw/TMDB_movie_dataset_v11.csv, computes the numbers required by
-IMPLEMENTATION.md T1.1, prints them, and writes docs/schema.md.
+IMPLEMENTATION.md T1.1 at tag v2.0, prints them, and writes docs/schema.md.
 """
 import random
 

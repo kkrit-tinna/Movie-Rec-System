@@ -4,7 +4,7 @@ Cosine similarity is computed in chunks of `chunk_size` query rows against
 the full matrix. A full N x N dense similarity matrix does not fit in
 memory at catalog scale, so each chunk (chunk_size x N) is densified,
 reduced to its top K+1, and discarded before the next chunk starts -- see
-IMPLEMENTATION.md T1.5.
+IMPLEMENTATION.md T1.5 at tag v2.0.
 """
 import argparse
 import io
