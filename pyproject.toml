@@ -1,25 +1,28 @@
 [project]
 name = "movierec"
 version = "0.1.0"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
+# Exact pins from the live batch image (T5.1); full lock in constraints/batch.txt.
+# boto3 is the batch version; the API image keeps its own (§7 T5.1).
 dependencies = [
-    "pandas",
-    "scikit-learn",
-    "scipy",
-    "joblib",
-    "pyarrow",
-    "pyyaml",
-    "kaggle",
-    "gensim",
-    "psutil",
-    "boto3",
+    "pandas==3.0.6",
+    "scikit-learn==1.9.1",
+    "scipy==1.18.1",
+    "joblib==1.6.0",
+    "pyarrow==25.0.1",
+    "pyyaml==6.0.3",
+    "kaggle==2.2.4",
+    "gensim==4.4.0",
+    "psutil==7.2.2",
+    "boto3==1.43.108",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest", "matplotlib", "moto[s3,dynamodb]"]
 # Serving only (T4.4); kept out of the base deps so the batch image does not grow.
 # mangum + a2wsgi: Lambda (ASGI) in front of the Flask (WSGI) app.
-api = ["flask", "rapidfuzz", "mangum", "a2wsgi"]
+# Exact pins from the live images (T5.1); full locks in constraints/*.txt.
+api = ["flask==3.1.3", "rapidfuzz==3.14.6", "mangum==0.22.0", "a2wsgi==1.10.10"]
 
 [build-system]
 requires = ["setuptools>=68"]

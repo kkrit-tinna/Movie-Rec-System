@@ -20,6 +20,7 @@ Phase 2.
 ## Environment
 - Python 3.12, venv at `movie_rec_venv/`. Activate before running anything.
 - Dependencies in `pyproject.toml`. No `requirements.txt`.
+  Exception: `constraints/*.txt` are lock files frozen from the images, not a second dependency list.
 - Thresholds and model params live in `config/default.yaml`. Never hardcode
   one in a module.
 - `STORAGE_BACKEND=local|s3` selects the store. Nothing outside

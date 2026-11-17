@@ -93,7 +93,14 @@ after T6.5.
   ends 2027-03-10.
 - Terraform state is local in `infra/`; `alert_email` is in the gitignored
   `infra/terraform.tfvars`.
-- Pinned versions after T5.1: <fill in>
+- Pinned versions after T5.1 (full locks in `constraints/batch.txt`, `constraints/api.txt`):
+  - Base image: `python:3.12.15-slim-trixie@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704`
+  - Base deps: pandas 3.0.6, scikit-learn 1.9.1, scipy 1.18.1, joblib 1.6.0,
+    pyarrow 25.0.1, pyyaml 6.0.3, kaggle 2.2.4, gensim 4.4.0, psutil 7.2.2,
+    boto3 1.43.108
+  - `[api]`: flask 3.1.3, rapidfuzz 3.14.6, mangum 0.22.0, a2wsgi 1.10.10
+  - API image only: awslambdaric 4.2.0; boto3/botocore 1.43.106 (older than
+    batch on purpose, §7 T5.1)
 
 ---
 
