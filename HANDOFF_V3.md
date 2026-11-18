@@ -66,8 +66,8 @@ after T6.5.
 
 | Task | Status | Commit | Notes |
 |---|---|---|---|
-| T5.1 Pin dependencies | | | |
-| T5.2 ECR cleanup | | | ECR before → after: |
+| T5.1 Pin dependencies | Done | c4ca9aa | Pinned to the live images' freezes; see Environment |
+| T5.2 ECR cleanup | Done | docs: ecr-cleanup | ECR stored before → after: 384.6 → 314.7 MB (of 500) |
 | T6.1 Serving decision | | | Decision: |
 | T6.2 Search index + scorer | | | Index run_date: |
 | T6.3 Evaluation | | | P@10 vs random: |
@@ -106,16 +106,21 @@ after T6.5.
 
 ## Carried issues and notes
 
-- <open items found during v3>
+- 4 untagged images in `movierec-batch` from the 2026-10-07 pushes; they add only ~1 MB of
+  unique storage, so they were left in place at T5.2 (§7).
+- `notes/ecr_usage.py` (gitignored) measures ECR stored bytes. The spec checks the ECR
+  total before every push, so consider moving it to `scripts/` before T6.5.
 
 ## Spend
 
-- <per task, when AWS was used>
+- T5.2: $0 (read and delete calls are free); ECR storage down 69.9 MB.
 
 ## For the runbook
 
 - <anything to add to `docs/runbook.md` at T6.5, e.g. rebuilding the search
   index>
+- How to measure the ECR total: stored bytes (unique layers per repo), not the
+  sum of `describe-images` sizes (T5.2, §7).
 
 ## Lessons from v3
 
