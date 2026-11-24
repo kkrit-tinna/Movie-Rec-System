@@ -240,6 +240,7 @@ For each, record the compressed image size, the local cold-load time, peak memor
 - Entrypoint timeout 45m → 15m; `run_date` semantics; a "no successful run in 8 days" alarm.
 - Measure a real reload's time; a `schedule_enabled` variable.
 - Popularity baseline; the "matched on" explanation; collaborative filtering / hybrid; GloVe or sentence-embedding queries.
+- Human-judgment evaluation (new experiment, added 2026-11-24): P@10 and nDCG@10 for the recommendations, using the author's manual annotations of v2's results as ground truth, beside a random floor and Keyword Jaccard@10 (does the automatic metric rank the methods the same way?). Fix before computing: the query movies and methods scored; the relevance scale (binary, or graded 0/1/2 for nDCG); how unjudged films count, since the annotations cover only what v2 returned and a changed method returns unjudged films; one annotator and the sample size stated, with spread as well as means. It becomes the yardstick for the other Phase 7 fixes.
 
 ---
 

@@ -64,8 +64,9 @@ T6.4 must add the `search_index.*` files to `.dockerignore`'s allow list and
 
 **Also in week 2 (not a spec task):** the manual evaluation of v2's recommendations is
 finished; analyze it and add the findings to "Evaluation feedback" below (finding 2
-onward). Analysis of the existing judgments only; any new metric or comparison gets
-agreed first.
+onward). Descriptive analysis of the existing judgments only. Scoring with P@10 /
+nDCG@10 on these judgments is a new experiment, placed in the Phase 7 backlog
+(IMPLEMENTATION_V3.md §6) with the rules to fix before computing.
 
 **Cut line:** applied. T6.2 was committed Nov 24, after ~Nov 20, so T6.3 (evaluation)
 moves after T6.5 (Nov 30 – Dec 1).
