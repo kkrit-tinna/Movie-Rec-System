@@ -51,14 +51,24 @@ Full history: v2's `IMPLEMENTATION.md` §9 (in git history) and the runbook.
 
 ## Where I am right now
 
-*Last updated: <date>*
+*Last updated: 2026-11-24*
 
-**Status:** <current task, what's committed, what's live>
+**Status:** Phase 5 done (T5.1 `c4ca9aa`, T5.2 `433e17e`). T6.1 chose option (A),
+scikit-learn + scipy in the API image (`3d31810`). T6.2's search index and scorer are
+committed (`80b106e`), built from run 2026-11-22. Nothing new is live: the site still
+serves `t4.5-2026-10-26`.
 
-**Next:** <next task and session date>
+**Next:** T6.4 (API endpoint and page), then T6.5 (deploy), in week 2 (Nov 23–29).
+T6.4 must add the `search_index.*` files to `.dockerignore`'s allow list and
+`Dockerfile.api`.
 
-**Cut line:** if T6.2 isn't committed by ~Nov 20, T6.3 (evaluation) moves
-after T6.5.
+**Also in week 2 (not a spec task):** the manual evaluation of v2's recommendations is
+finished; analyze it and add the findings to "Evaluation feedback" below (finding 2
+onward). Analysis of the existing judgments only; any new metric or comparison gets
+agreed first.
+
+**Cut line:** applied. T6.2 was committed Nov 24, after ~Nov 20, so T6.3 (evaluation)
+moves after T6.5 (Nov 30 – Dec 1).
 
 ---
 
@@ -177,7 +187,17 @@ Free-text search reuses this TF-IDF representation and forbids reranking
 
 ## Lessons from v3
 
-- <fill in at the end of each week>
+Week 1 (feedback on the system itself is in `docs/week1_v3_summary.md`):
+- Renaming the project folder breaks the venv (activate, script shebangs and the editable
+  install all store the old path). Fix: `python3.12 -m venv --clear movie_rec_venv`, then
+  `pip install -e ".[dev,api]" -c constraints/batch.txt`.
+- The local copies of the live images were the only exact record of what production runs.
+  Keep the current live image on the laptop until its replacement is live.
+- ECR's total is stored unique layers, not the sum of `describe-images` sizes (1,255 MB vs
+  385 MB here).
+- Reading the matched documents explains odd results in minutes; do that before guessing at fixes.
+- Week 1 slipped to a late catch-up on Nov 24; the cut line, set in advance, made the
+  reshuffle a rule to follow rather than a decision to make.
 
 ---
 
