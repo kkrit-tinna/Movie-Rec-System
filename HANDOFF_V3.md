@@ -68,7 +68,7 @@ after T6.5.
 |---|---|---|---|
 | T5.1 Pin dependencies | Done | c4ca9aa | Pinned to the live images' freezes; see Environment |
 | T5.2 ECR cleanup | Done | docs: ecr-cleanup | ECR stored before → after: 384.6 → 314.7 MB (of 500) |
-| T6.1 Serving decision | | | Decision: |
+| T6.1 Serving decision | Done | docs: search-serving-decision | Decision: **(A) scikit-learn + scipy in the API image** (run D 2026-11-22). Size 172.5 ≤ 185.3 MB and cold load 1.81 ≤ 3 s; ECR margin only 12.8 MB, so measure before T6.5's push (§7) |
 | T6.2 Search index + scorer | | | Index run_date: |
 | T6.3 Evaluation | | | P@10 vs random: |
 | T6.4 API + page | | | |
@@ -78,10 +78,14 @@ after T6.5.
 
 | | (A) scikit-learn in image | (B) numpy-only index |
 |---|---|---|
-| Compressed image size | | |
-| Cold load (local) | | |
-| Peak memory | | |
-| Warm query time | | |
+| Compressed image size | 172.5 MB | 112.8 MB |
+| Cold load (local), median / max of 5 | 1.81 s / 1.99 s | 0.43 s / 0.47 s |
+| Peak memory (ru_maxrss) | 160.5 MB | 110.8 MB |
+| Warm query time, median per query | 4.5–5.2 ms | ~200 ms (unoptimised prototype) |
+
+Run D 2026-11-22, 77,281 films. Size: `docker save \| gzip -c \| wc -c`. Runs: 5 fresh
+containers, `--memory=1024m --cpus=0.58`. Queries: 5 fixed queries, 1 warm-up + 50 runs, top 10
+over all rows. Rule: (A) if size ≤ 185.3 MB and median cold load ≤ 3 s. Both hold → (A). Full line in §7.
 
 ---
 
