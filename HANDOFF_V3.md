@@ -69,10 +69,20 @@ after T6.5.
 | T5.1 Pin dependencies | Done | c4ca9aa | Pinned to the live images' freezes; see Environment |
 | T5.2 ECR cleanup | Done | docs: ecr-cleanup | ECR stored before → after: 384.6 → 314.7 MB (of 500) |
 | T6.1 Serving decision | Done | docs: search-serving-decision | Decision: **(A) scikit-learn + scipy in the API image** (run D 2026-11-22). Size 172.5 ≤ 185.3 MB and cold load 1.81 ≤ 3 s; ECR margin only 12.8 MB, so measure before T6.5's push (§7) |
-| T6.2 Search index + scorer | | | Index run_date: |
+| T6.2 Search index + scorer | Done (uncommitted) | feat: free-text-search-index | Index run_date: **2026-11-22**. Option (A): `artifacts/api/search_index.{joblib,npz,json}` (1.98 MB + 25.6 MB + 0.50 MB). 282 tests pass; 5/5 run-D queries match the sklearn reference top 10 (§7) |
 | T6.3 Evaluation | | | P@10 vs random: |
 | T6.4 API + page | | | |
 | T6.5 Deploy | | | Live tag / digest: |
+
+### T6.2 run-D top 10 (equal to the sklearn reference, 5/5)
+
+- **dream heist:** Notes for a Heist Film · A Heist with Markiplier · Money Heist: The Phenomenon · The Hurricane Heist · The Last Heist · Bank Robbers: The Last Great Heist · Binky Nelson Unpacified · Money Plane · The Bling Ring · Dead Heist
+- **survival in space:** Scum · Project Gemini · Final Space · Space Warriors · Closet Space · Tex Montana Will Survive! · Journey to Space · Walking Out · Dead of Winter · Rescue Dawn
+- **haunted house:** The Haunted House (1921) · Borley Rectory · Dark House · House of Fears · The House on Pine Street · The Maiden · House of Purgatory · Spooks Run Wild · The Haunted House (1929) · Bhaagamathie
+- **time travel romance:** Frequently Asked Questions About Time Travel · Safety Not Guaranteed · Lee's Adventures · SommerHundeSöhne · The History of Time Travel · Back in Time · Timecop · Journey to the Center of Time · Shifter · Kim Possible: A Sitch In Time
+- **heist:** A Heist with Markiplier · Notes for a Heist Film · Money Heist: The Phenomenon · The Hurricane Heist · The Last Heist · Bank Robbers: The Last Great Heist · Binky Nelson Unpacified · Money Plane · Dead Heist · White Heat
+
+No Inception for "dream heist": its document (title, tagline, overview, genres) contains neither "dream" nor "heist" (checked on run D), so lexical search can't find it. Note for T6.3, alongside the rare-term pattern from Evaluation feedback #1.
 
 ### T6.1 measurements
 

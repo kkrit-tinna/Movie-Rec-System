@@ -90,6 +90,19 @@ api:
   host: 127.0.0.1
   port: 8000
 
+search:
+  # Free-text search (T6.2, option A from T6.1). Results per query; ranking
+  # is cosine over the whole TF-IDF matrix, ties by movie id ascending.
+  top_k: 10
+  # A query with fewer distinct vocabulary terms (unigrams and bigrams in
+  # the run's vectorizer) than this returns no results and a reason.
+  min_query_terms: 1
+  # Path stem of the index built by `python -m movierec.index.search`;
+  # files are <stem>.joblib, .npz, .json. Under artifacts/, so git-ignored
+  # and bundled into the API image deliberately (T6.4). Env
+  # MOVIEREC_SEARCH_INDEX_PATH overrides.
+  index_path: artifacts/api/search_index
+
 storage:
   # get_store() (storage/factory.py) precedence: explicit argument, then env
   # STORAGE_BACKEND / MOVIEREC_S3_BUCKET, then these values, then code
