@@ -111,6 +111,45 @@ after T6.5.
 - `notes/ecr_usage.py` (gitignored) measures ECR stored bytes. The spec checks the ECR
   total before every push, so consider moving it to `scripts/` before T6.5.
 
+## Evaluation feedback
+
+Findings from manual evaluation of the live recommendations. Fixes are Phase 7
+work: each one changes Keyword Jaccard@10, so it is an experiment to name and
+approve before running (§0 rule 7).
+
+### 1. Single rare terms pull in unrelated obscure films (TF-IDF, 2026-11-17)
+
+Query: Inception, "Similar details" (TF-IDF). What each neighbour shares with it,
+read from the raw overviews:
+
+| # | Neighbour | Shared terms | Votes |
+|---|---|---|---|
+| 1 | Inception: The Cobol Job | "inception", "cobb" (genuine tie-in) | 290 |
+| 2 | Now More than Ever: The History of Chicago | "inception" as in "from their inception in 1967" | 11 |
+| 3 | The Wilding | "offered a chance" | 14 |
+| 4 | The Fountain of Youth | "offered a chance" | 12 |
+| 5 | Prince | "thief", "commits", same genres (loosely fair) | 14 |
+| 6 | One Careful Owner | "offered a chance" | 27 |
+
+Causes:
+- A rare word gets a high IDF, so sharing it counts as strong evidence even when
+  it is used in a different sense (the query's title word in an unrelated overview).
+- `ngram_range: [1, 2]` with stop words removed turns stock phrasing into a rare
+  bigram ("offered chance"), which alone pulled in three of six neighbours.
+- Obscure films have one-sentence overviews; after L2 normalisation one shared
+  rare term dominates a short document.
+
+Removing the title from the document would not fix it on its own: Inception's
+overview also contains "inception".
+
+Candidate Phase 7 experiments (cheapest first):
+1. Popularity floor or prior (vote_count), alongside the planned popularity baseline.
+2. Unigrams only, or a higher `min_df` for bigrams.
+3. BM25 or length-normalised weighting in place of plain TF-IDF cosine.
+
+Free-text search reuses this TF-IDF representation and forbids reranking
+(Phase 6 rules), so expect the same pattern there; note it in T6.3's write-up.
+
 ## Spend
 
 - T5.2: $0 (read and delete calls are free); ECR storage down 69.9 MB.
