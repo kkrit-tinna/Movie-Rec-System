@@ -14,6 +14,10 @@
   The only reason shown on a card is genres it shares with the picked movie.
   Keywords are never shown: they are the held-out evaluation label the models
   never saw, so presenting them as a reason would be false.
+
+  Two modes (T6.4): "Find by title" (/api/search, then /api/similar) and
+  "Describe a movie", free-text search (/api/query): the visitor's words are
+  matched against each film's title, tagline, overview and genres.
 -->
 <style>
   :root {
@@ -55,6 +59,14 @@
   .intro h1 { font-size: 1.8rem; line-height: 1.2; margin: 8px 0 6px; }
   .intro p { color: var(--muted); margin: 0 0 18px; }
 
+  /* Mode switch */
+  .modes { margin: 0 0 14px; }
+  .note-box {
+    max-width: 640px; margin: 16px 0 0; padding: 12px 14px;
+    background: var(--surface); border: 1px dashed var(--border); border-radius: 10px;
+    color: var(--muted);
+  }
+
   /* Search */
   .search { position: relative; max-width: 640px; }
   .search input {
@@ -67,6 +79,13 @@
     color: var(--text);
   }
   .search input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .describe { display: flex; gap: 8px; }
+  .describe input { flex: 1; min-width: 0; }
+  .describe .go {
+    border: 0; border-radius: 10px; padding: 0 18px; cursor: pointer;
+    background: var(--accent); color: var(--accent-text); font-weight: 600;
+  }
+  .describe .go:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .suggestions {
     position: absolute; z-index: 10; left: 0; right: 0; top: calc(100% + 4px);
     margin: 0; padding: 4px 0; list-style: none;
@@ -184,9 +203,15 @@
 <main>
   <section id="intro" class="intro">
     <h1>Find movies like the ones you love</h1>
-    <p>Pick a film and we'll suggest 10 with a similar story.</p>
+    <p id="intro-text">Pick a film and we'll suggest 10 with a similar story.</p>
   </section>
 
+  <div class="modes toggle" role="group" aria-label="How to search">
+    <button type="button" data-mode="title" aria-pressed="true">Find by title</button>
+    <button type="button" data-mode="describe" aria-pressed="false">Describe a movie</button>
+  </div>
+
+  <div id="title-mode">
   <div class="search">
     <input id="q" type="search" placeholder="Type a movie title, e.g. Inception"
            autocomplete="off" autocapitalize="off" spellcheck="false"
@@ -201,6 +226,27 @@
     <button type="button" class="chip" data-id="862">Toy Story</button>
     <button type="button" class="chip" data-id="238">The Godfather</button>
     <button type="button" class="chip" data-id="155">The Dark Knight</button>
+  </div>
+  </div>
+
+  <!-- Free-text search (T6.4). -->
+  <div id="describe-mode" hidden>
+    <form id="describe-form" class="search describe" role="search">
+      <input id="describe-q" type="search" placeholder="Describe a movie, e.g. dream heist"
+             autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="200"
+             aria-label="Describe a movie in a few words">
+      <button type="submit" class="go">Search</button>
+    </form>
+    <div id="describe-examples" class="examples">
+      <span>Try:</span>
+      <button type="button" class="chip" data-q="dream heist">dream heist</button>
+      <button type="button" class="chip" data-q="haunted house">haunted house</button>
+      <button type="button" class="chip" data-q="survival in space">survival in space</button>
+      <button type="button" class="chip" data-q="time travel romance">time travel romance</button>
+    </div>
+    <p id="describe-note" class="note-box">Describe a movie in a few words, such as a
+    plot, a setting or a theme. Free-text search finds the 10 films whose title,
+    tagline, plot summary or genres best match your words.</p>
   </div>
 
   <p id="status" class="status" role="status" aria-live="polite"></p>
@@ -229,6 +275,21 @@
     </div>
 
     <section id="grid" class="grid" aria-label="Similar movies"></section>
+  </section>
+
+  <section id="described" hidden>
+    <div class="results-head">
+      <h3 id="described-title"></h3>
+      <details>
+        <summary>How does free-text search work?</summary>
+        <p>Your words are compared with the words in each film's title, tagline,
+        plot summary and genres (TF-IDF, the same representation as Similar
+        details). Rare words count for more than common ones, and films are
+        ranked by how closely their words match yours. It matches words, not
+        meaning: a film whose description doesn't use your words won't appear.</p>
+      </details>
+    </div>
+    <section id="described-grid" class="grid" aria-label="Matching movies"></section>
   </section>
 
   <footer>
@@ -260,7 +321,29 @@
   var hero = document.getElementById("hero");
   var resultsTitle = document.getElementById("results-title");
   var grid = document.getElementById("grid");
-  var toggles = Array.prototype.slice.call(document.querySelectorAll(".toggle button"));
+  var toggles = Array.prototype.slice.call(document.querySelectorAll(".match .toggle button"));
+  var modeButtons = Array.prototype.slice.call(document.querySelectorAll(".modes button"));
+  var introText = document.getElementById("intro-text");
+  var titleMode = document.getElementById("title-mode");
+  var describeMode = document.getElementById("describe-mode");
+  var describeForm = document.getElementById("describe-form");
+  var describeInput = document.getElementById("describe-q");
+  var describeExamples = document.getElementById("describe-examples");
+  var describeNote = document.getElementById("describe-note");
+  var described = document.getElementById("described");
+  var describedTitle = document.getElementById("described-title");
+  var describedGrid = document.getElementById("described-grid");
+
+  var INTRO = {
+    title: "Pick a film and we'll suggest 10 with a similar story.",
+    describe: "Describe a film in a few words and we'll find 10 that match."
+  };
+  // /api/query's reasons for returning no films, in plain words.
+  var REASON_TEXT = {
+    empty_query: "Type a few words that describe a movie, such as \u201cdream heist\u201d.",
+    no_known_terms: "None of those words appear in any film's title, tagline, plot summary or genres. Try different words.",
+    too_few_known_terms: "Too few of those words appear in our films' descriptions. Try adding a word or two."
+  };
 
   var method = "tfidf";
   var current = null;     // the hero: {id, title}
@@ -270,6 +353,8 @@
   var debounceTimer = null;
   var searchSeq = 0;      // drop responses that arrive out of order
   var similarSeq = 0;
+  var querySeq = 0;
+  var mode = "title";
 
   function label(movie) {
     return movie.year ? movie.title + " (" + movie.year + ")" : String(movie.title);
@@ -434,6 +519,94 @@
     });
   });
 
+  // ---- mode switch -------------------------------------------------------
+
+  function setMode(next) {
+    mode = next;
+    modeButtons.forEach(function (b) {
+      b.setAttribute("aria-pressed", b.dataset.mode === next ? "true" : "false");
+    });
+    setStatus("");
+    closeList();
+    var describe = next === "describe";
+    introText.textContent = INTRO[next];
+    titleMode.hidden = describe;
+    describeMode.hidden = !describe;
+    // Title mode keeps its picked movie; describe mode keeps its results.
+    picked.hidden = describe || !current;
+    intro.hidden = !describe && !!current;
+    examples.hidden = !!current;
+    described.hidden = !describe || !describedGrid.childNodes.length;
+    if (describe) describeInput.focus();
+  }
+
+  modeButtons.forEach(function (button) {
+    button.addEventListener("click", function () {
+      if (button.dataset.mode !== mode) setMode(button.dataset.mode);
+    });
+  });
+
+  // ---- free-text search ("Describe a movie") ------------------------------
+
+  function showNote(text) {
+    described.hidden = true;
+    describedGrid.textContent = "";
+    describeNote.textContent = text;
+    describeNote.hidden = false;
+  }
+
+  function runQuery(query) {
+    var seq = ++querySeq;
+    if (!query) {
+      showNote(REASON_TEXT.empty_query);
+      return;
+    }
+    describedGrid.setAttribute("aria-busy", "true");
+    setStatus("Searching\u2026");
+    getJSON("/api/query?q=" + encodeURIComponent(query))
+      .then(function (body) {
+        if (seq !== querySeq) return;
+        setStatus("");
+        var recs = body.results || [];
+        if (!recs.length) {
+          showNote(REASON_TEXT[body.reason] ||
+            "No films match \u201c" + query + "\u201d. Try different words.");
+          return;
+        }
+        describeNote.hidden = true;
+        describedTitle.textContent = "Films matching \u201c" + query + "\u201d";
+        renderGrid(describedGrid, recs, [], function (movie) {
+          setMode("title");
+          show(String(movie.id), "new");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+        described.hidden = false;
+        if (recs.length < 10) {
+          setStatus("Only " + recs.length + (recs.length === 1 ? " film matches" : " films match") +
+            " those words.");
+        }
+      }, function (err) {
+        if (seq !== querySeq) return;
+        setStatus("Free-text search failed (" + err.message + "). Try again.", true);
+      })
+      .then(function () {
+        if (seq === querySeq) describedGrid.removeAttribute("aria-busy");
+      });
+  }
+
+  describeForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    describeInput.blur();  // drops the phone keyboard so results are visible
+    runQuery(describeInput.value.trim());
+  });
+
+  Array.prototype.forEach.call(describeExamples.querySelectorAll(".chip"), function (chip) {
+    chip.addEventListener("click", function () {
+      describeInput.value = chip.dataset.q;
+      runQuery(chip.dataset.q);
+    });
+  });
+
   // ---- hero, history and results ----------------------------------------
 
   backBtn.addEventListener("click", function () {
@@ -465,7 +638,10 @@
         renderHero(movie, title);
         var recs = body.recommendations || [];
         resultsTitle.textContent = "If you liked " + title + ", try these";
-        renderGrid(recs, movie.genres || []);
+        renderGrid(grid, recs, movie.genres || [], function (rec) {
+          show(String(rec.id), "next");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
         setStatus(recs.length ? "" : "No similar movies found for " + title + ".");
       }, function (err) {
         if (seq !== similarSeq) return;
@@ -545,18 +721,16 @@
     hero.appendChild(info);
   }
 
-  function renderGrid(recs, heroGenres) {
-    grid.textContent = "";
+  // Cards for `recs` into `container`; `onPick(movie)` runs when one is clicked.
+  function renderGrid(container, recs, heroGenres, onPick) {
+    container.textContent = "";
     recs.forEach(function (movie, i) {
       var title = movie.title ? String(movie.title) : "Untitled";
 
       var card = el("button", "card");
       card.type = "button";
       card.setAttribute("aria-label", "#" + (i + 1) + " " + label({ title: title, year: movie.year }) + ". Show movies like this one");
-      card.addEventListener("click", function () {
-        show(String(movie.id), "next");
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      });
+      card.addEventListener("click", function () { onPick(movie); });
 
       var box = poster(movie, title, CARD_POSTER, true);
       box.appendChild(el("span", "rank", "#" + (i + 1)));
@@ -575,7 +749,7 @@
 
       card.appendChild(box);
       card.appendChild(body);
-      grid.appendChild(card);
+      container.appendChild(card);
     });
   }
 })();

@@ -200,3 +200,27 @@ def test_scorer_import_does_not_load_pandas():
     """The API (T6.4) imports SearchIndex; the slim image has no pandas."""
     code = "import sys, movierec.index.search; sys.exit('pandas' in sys.modules)"
     assert subprocess.run([sys.executable, "-c", code]).returncode == 0
+
+
+class TestCli:
+    """`python -m movierec.index.search --config ...` as `make demo` runs it."""
+
+    def test_config_overlay_sets_store_and_index_path(self, sample_run, tmp_path, monkeypatch):
+        store, _, _ = sample_run
+        out = tmp_path / "demo_api" / "search_index"
+        overlay = tmp_path / "overlay.yaml"
+        overlay.write_text(
+            f"storage:\n  local_root: {store.root}\nsearch:\n  index_path: {out}\n"
+        )
+        monkeypatch.delenv(search.INDEX_PATH_ENV, raising=False)
+        search.main(["--storage", "local", "--config", str(overlay), "--run-date", RUN_DATE])
+        assert all(p.exists() for p in index_files(out).values())
+        assert SearchIndex.load(out, config=CONFIG).run_date == RUN_DATE
+
+    def test_sample_config_keeps_demo_index_out_of_artifacts(self):
+        repo = Path(__file__).resolve().parents[1]
+        default = search.load_config()["search"]["index_path"]
+        demo = search.load_config(str(repo / "config" / "sample.yaml"))
+        assert default == "artifacts/api/search_index"
+        assert demo["search"]["index_path"].startswith(demo["storage"]["local_root"] + "/")
+        assert demo["search"]["index_path"] != default

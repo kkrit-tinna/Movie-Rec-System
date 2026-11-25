@@ -52,14 +52,17 @@ def test_deep_merge_changes_only_overlay_keys():
     }
 
 
-def test_sample_overlay_changes_only_count_floors_and_store_root():
+def test_sample_overlay_changes_only_count_floors_store_root_and_search_index():
     default, sample = pipeline.load_config(), pipeline.load_config(OVERLAY)
     assert sample["quality"]["row_count_min"] == 5000
     assert sample["quality"]["catalog_count_min"] == 250
     assert sample["storage"]["local_root"] == "demo_artifacts"
+    # `make demo`'s free-text search index, kept out of artifacts/ (T6.4).
+    assert sample["search"]["index_path"] == "demo_artifacts/api/search_index"
     for key in ("row_count_min", "catalog_count_min"):
         default["quality"].pop(key), sample["quality"].pop(key)
     default["storage"].pop("local_root"), sample["storage"].pop("local_root")
+    default["search"].pop("index_path"), sample["search"].pop("index_path")
     assert sample == default
 
 

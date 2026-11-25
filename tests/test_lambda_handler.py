@@ -2,8 +2,12 @@ import importlib
 import json
 import sys
 
+import joblib
 import pytest
+import scipy.sparse as sp
+from sklearn.feature_extraction.text import TfidfVectorizer
 
+from movierec.index.search import INDEX_PATH_ENV, index_files
 from movierec.index.titles import write_title_index
 from movierec.storage import dynamo
 
@@ -23,6 +27,23 @@ ITEMS = {
     },
     "155": {"movie_id": "155", "title": "The Dark Knight", "year": 2008, "poster_path": "/p.jpg"},
 }
+
+
+SEARCH_RUN_DATE = "2026-11-22"
+# Free-text search docs per movie id; only Inception's has "heist".
+SEARCH_DOCS = {"27205": "dream heist thief", "155": "joker gotham", "1": "short film"}
+
+
+def write_search_index(stem) -> None:
+    """A tiny search index in the builder's file layout (<stem>.joblib/.npz/.json)."""
+    vectorizer = TfidfVectorizer(stop_words="english")
+    matrix = vectorizer.fit_transform(list(SEARCH_DOCS.values()))
+    paths = index_files(stem)
+    joblib.dump(vectorizer, paths[".joblib"])
+    sp.save_npz(paths[".npz"], matrix)
+    paths[".json"].write_text(
+        json.dumps({"run_date": SEARCH_RUN_DATE, "movie_ids": [int(i) for i in SEARCH_DOCS]})
+    )
 
 
 class StubReader:
@@ -72,9 +93,12 @@ class LambdaContext:
 
 @pytest.fixture
 def handler(tmp_path, monkeypatch):
-    """Import the module fresh, with the stub reader and a small title index."""
+    """Import the module fresh, with the stub reader and small title and
+    search indexes (never the real artifacts/, which a clean clone lacks)."""
     titles_path = write_title_index(TITLES, tmp_path / "titles.json.gz")
     monkeypatch.setenv("MOVIEREC_TITLES_PATH", str(titles_path))
+    write_search_index(tmp_path / "search_index")
+    monkeypatch.setenv(INDEX_PATH_ENV, str(tmp_path / "search_index"))
     monkeypatch.setattr(dynamo, "DynamoReader", StubReader)
     sys.modules.pop(MODULE, None)
     yield importlib.import_module(MODULE).handler
@@ -88,7 +112,16 @@ def _call(handler, path, query=""):
 
 
 def test_health(handler):
-    assert _call(handler, "/api/health") == (200, {"status": "ok", "titles": len(TITLES)})
+    assert _call(handler, "/api/health") == (
+        200,
+        {"status": "ok", "titles": len(TITLES), "search_index_run_date": SEARCH_RUN_DATE},
+    )
+
+
+def test_query_served_from_the_loaded_index(handler):
+    status, body = _call(handler, "/api/query", "q=heist")
+    assert status == 200 and body["reason"] is None
+    assert [r["id"] for r in body["results"]] == ["27205"]
 
 
 def test_search_passes_query_string(handler):

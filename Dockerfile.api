@@ -1,7 +1,8 @@
 # API image for T4.4: Lambda container image, arm64 like the batch image.
 # Slim on purpose (§9 2026-10-09): the API serves precomputed results, so it
-# carries none of the batch dependencies (pandas, sklearn, scipy, gensim).
-# tests/test_api_imports.py guards that the API code never needs them.
+# carries no pandas, pyarrow or gensim. scikit-learn, scipy and numpy are in
+# it since T6.4 (option A, T6.1) to load and score the free-text search index.
+# tests/test_api_imports.py guards that the API code never needs the rest.
 # Base pinned by digest (T5.1): same Python (3.12.15) as the live images; the
 # October digest was not cached, so Debian packages may differ (§7 T5.1).
 FROM python:3.12.15-slim-trixie@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
@@ -17,8 +18,10 @@ WORKDIR /app
 
 # Only the serving dependencies: the same package set as the live image
 # (awslambdaric runs the Lambda runtime; it is not in the venv). Versions come
-# from constraints/api.txt, the live image's pip freeze (T5.1); boto3 there
-# is older than in pyproject.toml on purpose (§7 T5.1).
+# from constraints/api.txt, the live image's pip freeze (T5.1) plus the
+# T6.4 search packages; boto3 there is older than in pyproject.toml on
+# purpose (§7 T5.1). scikit-learn pulls in joblib and threadpoolctl, also
+# pinned there.
 # --only-binary: a source build (gcc, cmake) fails the build rather than
 # needing build tools in the image.
 COPY constraints/api.txt constraints/api.txt
@@ -31,7 +34,10 @@ RUN pip install --only-binary=:all: -c constraints/api.txt \
         mangum \
         a2wsgi \
         pyyaml \
-        awslambdaric
+        awslambdaric \
+        scikit-learn \
+        scipy \
+        numpy
 
 # Editable, no deps: modules keep resolving config/ as <repo>/config, i.e.
 # /app/config, as in the batch image. compileall writes the .pyc files now.
@@ -46,6 +52,14 @@ RUN pip install --no-deps -e . \
 # `python -m movierec.index.titles`.
 COPY artifacts/api/titles.json.gz /app/titles.json.gz
 ENV MOVIEREC_TITLES_PATH=/app/titles.json.gz
+
+# Free-text search index (T6.4): run D's vectorizer, matrix and metadata,
+# built with `python -m movierec.index.search --run-date D`; .dockerignore
+# lets only these three files through. The env var is the path stem.
+COPY artifacts/api/search_index.joblib /app/search_index.joblib
+COPY artifacts/api/search_index.npz /app/search_index.npz
+COPY artifacts/api/search_index.json /app/search_index.json
+ENV MOVIEREC_SEARCH_INDEX_PATH=/app/search_index
 
 ENTRYPOINT ["python", "-m", "awslambdaric"]
 CMD ["movierec.api.lambda_handler.handler"]

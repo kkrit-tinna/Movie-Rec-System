@@ -8,10 +8,13 @@ API_IMAGE := movierec-api:dev
 .PHONY: demo demo-tfidf image push-image image-api push-image-api
 
 # Clean clone to working site, no AWS account or Kaggle key (T4.6). DEMO_CONFIG
-# puts the run in its own store (storage.local_root).
+# puts the run in its own store (storage.local_root) and the free-text search
+# index at demo_artifacts/api/search_index.* (search.index_path, T6.4), never
+# over artifacts/api/search_index.*.
 demo:
 	pip install -e ".[api]"
 	python -m movierec.pipeline --input $(DEMO_SAMPLE) --storage local --config $(DEMO_CONFIG) --run-date $(RUN_DATE)
+	python -m movierec.index.search --storage local --config $(DEMO_CONFIG) --run-date $(RUN_DATE)
 	@echo "Starting the site at http://localhost:8000"
 	python -m movierec.api --local --storage local --config $(DEMO_CONFIG) --run-date $(RUN_DATE)
 

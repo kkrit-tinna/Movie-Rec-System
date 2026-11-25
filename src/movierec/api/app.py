@@ -5,9 +5,16 @@ Serving is a key lookup: the neighbours were precomputed by the batch job, so
 match over the in-memory title index. Response shapes follow the v1 site
 (found / query / recommendations, results) so its page can be reused.
 
-create_app() takes its collaborators, so tests inject a moto-backed reader
-and a small title list; __main__.py wires the real ones.
+/api/query (T6.4) is free-text search: SearchIndex.query scores the text
+against the bundled TF-IDF index in memory, then the ids are hydrated with
+the same reader.batch_get (BatchGetItem) call /api/similar uses.
+
+create_app() takes its collaborators, so tests inject a moto-backed reader,
+a small title list and a small search index; __main__.py and
+lambda_handler.py wire the real ones, loading the search index once per
+process with load_search_index().
 """
+import os
 from pathlib import Path
 
 import yaml
@@ -15,6 +22,9 @@ from flask import Flask, jsonify, request
 from rapidfuzz import fuzz, process, utils
 
 from movierec.config import deep_merge
+# Scorer only: sklearn/scipy/numpy are imported inside SearchIndex, and this
+# module never imports pandas (the builder does, inside its function).
+from movierec.index.search import INDEX_PATH_ENV, SearchIndex
 
 CONFIG_PATH = Path(__file__).resolve().parents[3] / "config" / "default.yaml"
 
@@ -35,6 +45,17 @@ def load_config(overlay_path: str | None = None) -> dict:
         with open(overlay_path) as f:
             config = deep_merge(config, yaml.safe_load(f) or {})
     return config
+
+
+def search_index_path(config: dict) -> str:
+    """Env MOVIEREC_SEARCH_INDEX_PATH, then config search.index_path (a stem)."""
+    return os.environ.get(INDEX_PATH_ENV) or config["search"]["index_path"]
+
+
+def load_search_index(config: dict) -> SearchIndex:
+    """Load the free-text search index once, with this config's `search`
+    block (top_k, min_query_terms), so an overlay applies to it too."""
+    return SearchIndex.load(search_index_path(config), config=config["search"])
 
 
 def _clamp(value: int, upper: int) -> int:
@@ -71,10 +92,17 @@ def _display(item: dict) -> dict:
     }
 
 
-def create_app(reader, titles: list[dict], default_method: str, config: dict | None = None) -> Flask:
+def create_app(
+    reader,
+    titles: list[dict],
+    default_method: str,
+    config: dict | None = None,
+    search_index: SearchIndex | None = None,
+) -> Flask:
     """Build the app around a DynamoReader-like `reader` (get_item, batch_get)
     and a title index from movierec.index.titles. LocalReader has the same two
-    methods, for `make demo`."""
+    methods, for `make demo`. `search_index` (a loaded SearchIndex) serves
+    /api/query; without one, /api/query is 503 and health's run date null."""
     if default_method not in METHODS:
         raise ValueError(f"default_method {default_method!r} not in {METHODS}")
     config = config if config is not None else load_config()
@@ -98,8 +126,16 @@ def create_app(reader, titles: list[dict], default_method: str, config: dict | N
 
     @app.route("/api/health")
     def health():
-        """Liveness check; reports the size of the loaded title index."""
-        return jsonify({"status": "ok", "titles": len(titles)})
+        """Liveness check; reports the size of the loaded title index and the
+        run date the search index was built from, so drift from DynamoDB
+        shows."""
+        return jsonify(
+            {
+                "status": "ok",
+                "titles": len(titles),
+                "search_index_run_date": search_index.run_date if search_index else None,
+            }
+        )
 
     @app.route("/api/search")
     def search():
@@ -160,5 +196,22 @@ def create_app(reader, titles: list[dict], default_method: str, config: dict | N
                 "recommendations": recommendations,
             }
         )
+
+    @app.route("/api/query")
+    def query():
+        """Free-text search: top search.top_k films for the text, hydrated
+        with display fields. A query that cannot be scored is a 200 with no
+        results and the reason; fewer matches than top_k return fewer."""
+        if search_index is None:
+            return jsonify({"error": "search index not loaded"}), 503
+        text = request.args.get("q", "")
+        result = search_index.query(text)
+        scores = dict(zip(result.ids, result.scores))
+        hydrated = reader.batch_get(result.ids) if result.ids else []
+        results = [
+            {**_display(movie), "score": scores[movie["movie_id"]]}
+            for movie in hydrated
+        ]
+        return jsonify({"q": text, "results": results, "reason": result.reason})
 
     return app

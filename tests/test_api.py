@@ -9,9 +9,16 @@ import pytest
 from flask import Flask
 from moto import mock_aws
 from rapidfuzz import fuzz, utils
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from movierec.api import __main__ as api_main
 from movierec.api.app import METHODS, create_app, load_config
+from movierec.index.search import (
+    REASON_EMPTY,
+    REASON_NO_TERMS,
+    REASON_TOO_FEW_TERMS,
+    SearchIndex,
+)
 from movierec.index.titles import build_title_index, default_titles_path, load_title_index
 from movierec.storage.dynamo import DynamoReader, DynamoWriter, build_items
 
@@ -23,6 +30,7 @@ TITLES = [
     "Heat", "M",
 ]
 RECOMMENDATION_FIELDS = {"id", "title", "year", "score", "rating", "poster_path", "overview", "genres"}
+SEARCH_RUN_DATE = "2026-11-22"
 
 
 def _catalog() -> pd.DataFrame:
@@ -54,6 +62,19 @@ def _neighbours(catalog: pd.DataFrame, reverse: bool) -> pd.DataFrame:
     return pd.DataFrame(records, columns=["movie_id", "rank", "neighbour_id", "score"])
 
 
+def _search_index(catalog: pd.DataFrame, min_query_terms: int = 1) -> SearchIndex:
+    """A small real index: every film's text has "space station" plus its
+    title, so "space" matches all 15 films and "inception" only one."""
+    docs = [f"space station {t}" for t in catalog["title"]]
+    vectorizer = TfidfVectorizer(stop_words="english")
+    matrix = vectorizer.fit_transform(docs)
+    config = load_config()["search"]
+    return SearchIndex(
+        vectorizer, matrix, list(catalog["id"]), SEARCH_RUN_DATE,
+        config["top_k"], min_query_terms,
+    )
+
+
 @pytest.fixture
 def client(monkeypatch):
     for name, value in {
@@ -79,7 +100,12 @@ def client(monkeypatch):
             {"tfidf": _neighbours(catalog, False), "word2vec": _neighbours(catalog, True)},
         )
         DynamoWriter(TABLE, client=ddb).write(items)
-        app = create_app(DynamoReader(TABLE, client=ddb), build_title_index(catalog), "tfidf")
+        app = create_app(
+            DynamoReader(TABLE, client=ddb),
+            build_title_index(catalog),
+            "tfidf",
+            search_index=_search_index(catalog),
+        )
         yield app.test_client()
 
 
@@ -96,12 +122,27 @@ class TestPage:
         assert "innerHTML" not in script
         assert "onerror" not in page
         assert '"/api/search' in script and '"/api/similar/' in script
+        assert '"/api/query?q=' in script
         assert "lambda-url" not in page and "localhost" not in page
 
     def test_page_never_shows_keywords(self, client):
         # Keywords are the held-out evaluation label, never a shown reason.
         page = client.get("/").get_data(as_text=True)
         assert "keyword" not in page[page.index("<script>"):].lower()
+
+    def test_mode_switch_and_free_text_naming(self, client):
+        page = client.get("/").get_data(as_text=True)
+        assert re.search(r'data-mode="title"[^>]*>Find by title<', page)
+        assert re.search(r'data-mode="describe"[^>]*>Describe a movie<', page)
+        assert '<input id="describe-q"' in page
+        assert "free-text search" in page.lower()
+        assert "keyword search" not in page.lower()
+
+    def test_every_query_reason_has_plain_words(self, client):
+        script = client.get("/").get_data(as_text=True)
+        script = script[script.index("<script>"):]
+        for reason in (REASON_EMPTY, REASON_NO_TERMS, REASON_TOO_FEW_TERMS):
+            assert re.search(rf"\b{reason}: \"[A-Z][^\"]+\"", script), reason
 
     def test_tmdb_link_built_from_digit_only_id(self, client):
         page = client.get("/").get_data(as_text=True)
@@ -136,8 +177,102 @@ class TestPage:
 
 
 class TestHealth:
-    def test_reports_title_count(self, client):
-        assert client.get("/api/health").get_json() == {"status": "ok", "titles": len(TITLES)}
+    def test_reports_title_count_and_search_run_date(self, client):
+        assert client.get("/api/health").get_json() == {
+            "status": "ok",
+            "titles": len(TITLES),
+            "search_index_run_date": SEARCH_RUN_DATE,
+        }
+
+    def test_run_date_null_without_search_index(self):
+        client = create_app(None, [], "tfidf", config=load_config()).test_client()
+        assert client.get("/api/health").get_json()["search_index_run_date"] is None
+
+
+class TestQuery:
+    def test_ten_results_with_display_fields_in_index_order(self, client):
+        body = client.get("/api/query?q=space").get_json()
+        assert body["reason"] is None and body["q"] == "space"
+        results = body["results"]
+        assert len(results) == K
+        assert all(set(r) == RECOMMENDATION_FIELDS for r in results)
+        expected = _search_index(_catalog()).query("space")
+        assert [r["id"] for r in results] == expected.ids
+        assert [r["score"] for r in results] == expected.scores
+        scores = [r["score"] for r in results]
+        assert scores == sorted(scores, reverse=True) and scores[-1] > 0
+
+    def test_display_fields_come_from_the_item(self, client):
+        (only,) = client.get("/api/query?q=inception").get_json()["results"]
+        assert {k: v for k, v in only.items() if k != "score"} == {
+            "id": "100",
+            "title": "Inception",
+            "year": 1990,
+            "rating": 7.0,
+            "poster_path": "/p0.jpg",
+            "overview": ("overview of Inception, " + "x" * 300)[:200],
+            "genres": ["Action", "Science Fiction"],
+        }
+
+    def test_fewer_than_ten_matches_returns_fewer(self, client):
+        body = client.get("/api/query?q=inception").get_json()
+        assert body["reason"] is None
+        assert [r["id"] for r in body["results"]] == ["100"]
+
+    @pytest.mark.parametrize("url", ["/api/query", "/api/query?q=", "/api/query?q=%20%20"])
+    def test_empty_query(self, client, url):
+        response = client.get(url)
+        assert response.status_code == 200
+        assert response.get_json()["results"] == []
+        assert response.get_json()["reason"] == REASON_EMPTY
+
+    @pytest.mark.parametrize("q", ["zzzqqq", "the and of"])
+    def test_no_known_terms(self, client, q):
+        response = client.get(f"/api/query?q={q}")
+        assert response.status_code == 200
+        assert response.get_json()["results"] == []
+        assert response.get_json()["reason"] == REASON_NO_TERMS
+
+    def test_too_few_known_terms(self):
+        index = _search_index(_catalog(), min_query_terms=2)
+        client = create_app(None, [], "tfidf", config=load_config(), search_index=index).test_client()
+        response = client.get("/api/query?q=space")
+        assert response.status_code == 200
+        assert response.get_json()["results"] == []
+        assert response.get_json()["reason"] == REASON_TOO_FEW_TERMS
+
+    def test_hydrates_with_one_batch_get_and_none_when_no_results(self):
+        calls = []
+
+        class CountingReader:
+            def get_item(self, movie_id):
+                raise AssertionError("/api/query must not call get_item")
+
+            def batch_get(self, ids):
+                calls.append(list(ids))
+                return [{"movie_id": i, "title": "T"} for i in ids]
+
+        index = _search_index(_catalog())
+        client = create_app(CountingReader(), [], "tfidf", config=load_config(), search_index=index).test_client()
+        assert len(client.get("/api/query?q=space").get_json()["results"]) == K
+        assert calls == [index.query("space").ids]
+        client.get("/api/query?q=zzzqqq")
+        client.get("/api/query?q=")
+        assert len(calls) == 1
+
+    def test_index_path_from_config_then_env(self, monkeypatch):
+        from movierec.api.app import search_index_path
+        from movierec.index.search import INDEX_PATH_ENV
+
+        config = load_config()
+        monkeypatch.delenv(INDEX_PATH_ENV, raising=False)
+        assert search_index_path(config) == config["search"]["index_path"]
+        monkeypatch.setenv(INDEX_PATH_ENV, "/tmp/elsewhere/search_index")
+        assert search_index_path(config) == "/tmp/elsewhere/search_index"
+
+    def test_503_without_search_index(self):
+        client = create_app(None, [], "tfidf", config=load_config()).test_client()
+        assert client.get("/api/query?q=space").status_code == 503
 
 
 class TestSearch:
@@ -332,6 +467,7 @@ class TestMain:
         monkeypatch.setattr(Flask, "run", lambda self, **kw: calls.append(kw))
         monkeypatch.setattr(api_main, "DynamoReader", lambda: object())
         monkeypatch.setattr(api_main, "load_title_index", lambda path: [{"id": "1", "title": "X", "year": None}])
+        monkeypatch.setattr(api_main, "load_search_index", lambda config: None)
         monkeypatch.delenv(api_main.PORT_ENV, raising=False)
         monkeypatch.delenv(api_main.HOST_ENV, raising=False)
         return calls

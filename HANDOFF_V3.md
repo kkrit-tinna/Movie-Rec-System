@@ -55,12 +55,12 @@ Full history: v2's `IMPLEMENTATION.md` §9 (in git history) and the runbook.
 
 **Status:** Phase 5 done (T5.1 `c4ca9aa`, T5.2 `433e17e`). T6.1 chose option (A),
 scikit-learn + scipy in the API image (`3d31810`). T6.2's search index and scorer are
-committed (`80b106e`), built from run 2026-11-22. Nothing new is live: the site still
-serves `t4.5-2026-10-26`.
+committed (`80b106e`), built from run 2026-11-22. T6.4 (API endpoint and page) is done
+but uncommitted until `feat: free-text-search-api`; its image `movierec-api:dev` is
+built locally only. Nothing new is live: the site still serves `t4.5-2026-10-26`.
 
-**Next:** T6.4 (API endpoint and page), then T6.5 (deploy), in week 2 (Nov 23–29).
-T6.4 must add the `search_index.*` files to `.dockerignore`'s allow list and
-`Dockerfile.api`.
+**Next:** T6.5 (deploy and document), in week 2 (Nov 23–29). Measure the ECR total
+before the push (margin ~12.8 MB, §7 T6.1). T6.3 (evaluation) still comes after T6.5.
 
 **Also in week 2 (not a spec task):** the manual evaluation of v2's recommendations is
 finished; analyze it and add the findings to "Evaluation feedback" below (finding 2
@@ -80,9 +80,9 @@ moves after T6.5 (Nov 30 – Dec 1).
 | T5.1 Pin dependencies | Done | c4ca9aa | Pinned to the live images' freezes; see Environment |
 | T5.2 ECR cleanup | Done | docs: ecr-cleanup | ECR stored before → after: 384.6 → 314.7 MB (of 500) |
 | T6.1 Serving decision | Done | docs: search-serving-decision | Decision: **(A) scikit-learn + scipy in the API image** (run D 2026-11-22). Size 172.5 ≤ 185.3 MB and cold load 1.81 ≤ 3 s; ECR margin only 12.8 MB, so measure before T6.5's push (§7) |
-| T6.2 Search index + scorer | Done (uncommitted) | feat: free-text-search-index | Index run_date: **2026-11-22**. Option (A): `artifacts/api/search_index.{joblib,npz,json}` (1.98 MB + 25.6 MB + 0.50 MB). 282 tests pass; 5/5 run-D queries match the sklearn reference top 10 (§7) |
+| T6.2 Search index + scorer | Done | 80b106e | Index run_date: **2026-11-22**. Option (A): `artifacts/api/search_index.{joblib,npz,json}` (1.98 MB + 25.6 MB + 0.50 MB). 282 tests pass; 5/5 run-D queries match the sklearn reference top 10 (§7) |
 | T6.3 Evaluation | | | P@10 vs random: |
-| T6.4 API + page | | | |
+| T6.4 API + page | Done | feat: free-text-search-api | `GET /api/query?q=` + "Describe a movie" mode. Local image (not pushed): 172,493,512 B (172.5 MB ≤ 185.3), `sha256:0657d4da68fce4a0724f70b3dd0aca7d6afd73fcb87643b298de51e1805e63f1`, freeze = `constraints/api.txt` (§7). Clean-copy `make demo` check passed ("dream heist" → 10, "zzqx" and empty query → reasons, `/api/similar/27205` OK, page modes / no-match / card click OK) |
 | T6.5 Deploy | | | Live tag / digest: |
 
 ### T6.2 run-D top 10 (equal to the sklearn reference, 5/5)
@@ -181,8 +181,13 @@ Free-text search reuses this TF-IDF representation and forbids reranking
 
 ## For the runbook
 
-- <anything to add to `docs/runbook.md` at T6.5, e.g. rebuilding the search
-  index>
+- Rebuilding the free-text search index when the data changes (T6.5): with run D's
+  artifacts in the local store, `STORAGE_BACKEND=local python -m movierec.index.search
+  --run-date D` writes `artifacts/api/search_index.{joblib,npz,json}` (it reads only
+  the catalog's `id` column, never `keywords`). Then rebuild the API image
+  (`make image-api`), which bundles those files, and deploy a new tag. The index's
+  `run_date` should match the run DynamoDB serves (check `search_index.json`).
+  `make demo` builds its own index under `demo_artifacts/` and never touches these files.
 - How to measure the ECR total: stored bytes (unique layers per repo), not the
   sum of `describe-images` sizes (T5.2, §7).
 

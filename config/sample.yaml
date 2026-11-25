@@ -14,3 +14,8 @@ storage:
   # latest earlier report in the same store: a sample run in a store holding a
   # full-size run would fail it (§9 2026-10-31).
   local_root: demo_artifacts
+search:
+  # `make demo` builds its free-text search index from the demo run and
+  # serves it from here, so it never overwrites artifacts/api/search_index.*
+  # (the full run's index, bundled into the API image).
+  index_path: demo_artifacts/api/search_index

@@ -3,6 +3,8 @@
 Build (laptop, once per data change):
 
     STORAGE_BACKEND=local python -m movierec.index.search --run-date 2026-11-22
+    python -m movierec.index.search --storage local --config config/sample.yaml \
+        --run-date D        # `make demo`: demo_artifacts/ store and index path
 
 reads run D's TF-IDF vectorizer, matrix and row index and the catalog's `id`
 column through get_store(), checks they describe the same films, and writes
@@ -38,6 +40,8 @@ from pathlib import Path
 
 import yaml
 
+from movierec.config import deep_merge
+
 CONFIG_PATH = Path(__file__).resolve().parents[3] / "config" / "default.yaml"
 
 INDEX_PATH_ENV = "MOVIEREC_SEARCH_INDEX_PATH"
@@ -62,6 +66,16 @@ def load_search_config() -> dict:
         if key not in search:
             raise KeyError(f"config search.{key} is missing")
     return search
+
+
+def load_config(overlay_path: str | None = None) -> dict:
+    """default.yaml, with `overlay_path` (e.g. config/sample.yaml) merged over it."""
+    with open(CONFIG_PATH) as f:
+        config = yaml.safe_load(f)
+    if overlay_path:
+        with open(overlay_path) as f:
+            config = deep_merge(config, yaml.safe_load(f) or {})
+    return config
 
 
 def default_index_path() -> str:
@@ -211,16 +225,27 @@ class SearchIndex:
         )
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     from movierec.storage.factory import get_store
 
     parser = argparse.ArgumentParser(description="Build the free-text search index from a stored run.")
     parser.add_argument("--run-date", required=True, help="run whose TF-IDF artifacts to index")
     parser.add_argument("--out", default=None, help="index path stem; default env/config search.index_path")
-    args = parser.parse_args()
+    parser.add_argument(
+        "--config",
+        help="overlay merged over config/default.yaml; sets the local store "
+        "(storage.local_root) and the default index path (search.index_path)",
+    )
+    parser.add_argument(
+        "--storage", choices=("local", "s3"), default=None,
+        help="store backend; default env STORAGE_BACKEND, then config",
+    )
+    args = parser.parse_args(argv)
 
-    out = args.out or default_index_path()
-    meta = build_search_index(get_store(), args.run_date, out)
+    config = load_config(args.config)
+    out = args.out or os.environ.get(INDEX_PATH_ENV) or config["search"]["index_path"]
+    store = get_store(backend=args.storage, root=config["storage"].get("local_root"))
+    meta = build_search_index(store, args.run_date, out)
     print(f"run_date: {meta['run_date']}")
     print(f"rows x features: {meta['n_rows']} x {meta['n_features']} (nnz {meta['nnz']})")
     for path in index_files(out).values():

@@ -8,10 +8,14 @@ data/*
 data/sample/movies_demo.csv
 demo_artifacts/
 artifacts/*
-# The API image bundles the title index (Dockerfile.api, §7 T4.4).
+# The API image bundles the title index (Dockerfile.api, §7 T4.4) and the
+# free-text search index (T6.4).
 !artifacts/api/
 artifacts/api/*
 !artifacts/api/titles.json.gz
+!artifacts/api/search_index.joblib
+!artifacts/api/search_index.npz
+!artifacts/api/search_index.json
 movie_rec_venv/
 infra/
 .git/

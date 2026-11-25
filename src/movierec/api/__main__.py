@@ -13,12 +13,15 @@ so /api/similar hits the real table: every request is a few read units.
 account and no titles.json.gz; `make demo` uses it. --config picks the store
 through storage.local_root. On Lambda the entrypoint is
 lambda_handler.handler instead.
+
+Both storage modes load the free-text search index once at start-up, from
+env MOVIEREC_SEARCH_INDEX_PATH or the config's search.index_path.
 """
 import argparse
 import os
 import sys
 
-from movierec.api.app import METHODS, create_app, load_config
+from movierec.api.app import METHODS, create_app, load_config, load_search_index
 from movierec.index.titles import default_titles_path, load_title_index
 from movierec.storage.dynamo import DynamoReader
 
@@ -61,7 +64,13 @@ def main(argv: list[str] | None = None) -> None:
     else:
         reader = DynamoReader()
         titles = load_title_index(default_titles_path())
-    app = create_app(reader, titles, config["pipeline"]["default_method"], config=config)
+    app = create_app(
+        reader,
+        titles,
+        config["pipeline"]["default_method"],
+        config=config,
+        search_index=load_search_index(config),
+    )
     app.run(host=host, port=port, debug=False)
 
 
