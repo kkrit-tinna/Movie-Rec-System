@@ -332,8 +332,14 @@ The site is safe: a failed gate stops the run before anything is loaded.
 
 - **A new tag for every rebuild.** Lambda pins the image's digest at deploy, and ECR tags are mutable. Re-pushing a tag doesn't update the function, and `terraform plan` shows no change.
 - **Keep-last-5 counts pushes, not deploys.** ECR keeps the last 5 images per repository. Never push 5 API images without applying, or the image the live function is pinned to can expire.
-- **ECR's free allowance is 500 MB,** and about 385 MB was in use on 2026-10-26. Before the next push, pin dependencies and set `FROM` in both Dockerfiles to a digest: an unpinned rebuild can add ~230 MB of new layers. Above the allowance it costs about $0.10/GB-month.
-- **Warm the site once after a new image,** before sharing it. The first cold start after a deploy has been ~4 s, against ~1.9 s normally.
+- **ECR's free allowance is 500 MB,** and 444.6 MB was stored on 2026-11-25, after the `t6.5-2026-11-25` push. Above the allowance it costs about $0.10/GB-month. Before any push that adds large layers, measure the total and delete an old API tag first, but never the live one or the one you'd roll back to. A rebuild with unchanged dependencies adds only the changed top layers. A dependency change can add over 100 MB: the t6.5 image added 129.9 MB.
+- **Measure stored bytes, not the `describe-images` sum.** Run `python notes/ecr_usage.py before` (read-only, free calls). It counts each layer once per repository, which is what ECR stores and bills. Adding up `imageSizeInBytes` counts a shared layer once per image and overstates storage: on 2026-11-17 it reported 1,053 MB when 315 MB was stored.
+- **Warm the site after every apply,** before sharing it. Request `/api/health` until it returns 200. The first cold start after the t6.5 deploy ran past Lambda's 10 s init limit twice, and the visitor got a 502 after 20.6 s. Later cold starts took 4.16 s (Init Duration), so expect any new image's first start to fail and the second to work.
+
+  ```bash
+  URL=$(terraform -chdir=infra output -raw function_url)
+  until curl -sf -o /dev/null "${URL%/}/api/health"; do sleep 5; done; echo warm
+  ```
 
 ### Change an image
 
@@ -353,9 +359,38 @@ make push-image TAG=<new-tag>
 terraform -chdir=infra apply -var batch_image_tag=<new-tag>
 ```
 
-Review the plan before you approve it. The API image needs `artifacts/api/titles.json.gz` (step 4 below). Tag names so far look like `t4.5-2026-10-26`.
+Review the plan before you approve it. The API image needs `artifacts/api/titles.json.gz` (step 4 below) and the free-text search index `artifacts/api/search_index.{joblib,npz,json}` (next section). Tag names so far look like `t6.5-2026-11-25`.
 
 To make it stick, update that variable's default in `infra/variables.tf`, because later applies otherwise revert it.
+
+### Rebuild the free-text search index
+
+The page's "Describe a movie" mode searches an index bundled into the API image, not DynamoDB. A new batch run doesn't update it. Rebuild it when the data changes, so search and recommendations come from the same run. The live index is from run `2026-11-22`.
+
+1. Put run D's artifacts in the local store (`./artifacts`). The builder reads `tfidf/D/vectorizer.joblib`, `tfidf/D/matrix.npz`, `tfidf/D/row_index.parquet` and `catalog/D/catalog.parquet`. If they aren't local yet, copy them from S3 (`BUCKET` as in "Before you run anything"):
+
+   ```bash
+   export RUN_DATE=<D>
+   aws s3 cp "s3://$BUCKET/tfidf/$RUN_DATE/" "artifacts/tfidf/$RUN_DATE/" --recursive
+   aws s3 cp "s3://$BUCKET/catalog/$RUN_DATE/catalog.parquet" "artifacts/catalog/$RUN_DATE/"
+   ```
+
+2. Build the index. It reads only the catalog's `id` column, never `keywords`, and writes `artifacts/api/search_index.{joblib,npz,json}`:
+
+   ```bash
+   STORAGE_BACKEND=local python -m movierec.index.search --run-date "$RUN_DATE"
+   ```
+
+3. Check that the index's `run_date` matches the run DynamoDB serves (`current.json`, section 2):
+
+   ```bash
+   python -c "import json; d = json.load(open('artifacts/api/search_index.json')); print(d['run_date'], d['n_rows'], d['n_features'])"
+   ```
+
+4. Rebuild the API image and deploy it under a new tag, following "Change an image" and the image rules above: check the ECR total, `make image-api`, `make push-image-api TAG=<new-tag>`, set `api_image_tag` in `infra/variables.tf`, then `terraform -chdir=infra apply`. The plan should change only `image_uri`.
+5. Warm the site until `/api/health` returns 200, and check that it reports the new `search_index_run_date`. Then try one "Describe a movie" query.
+
+`make demo` builds its own index under `demo_artifacts/` and never touches these files.
 
 ### First deploy
 
@@ -375,6 +410,8 @@ To make it stick, update that variable's default in `infra/variables.tf`, becaus
    ```bash
    python -m movierec.index.titles --input data/raw/TMDB_movie_dataset_v11.csv
    ```
+
+   The API image also bundles the free-text search index, and `make image-api` fails without it. The index is built from a batch run's artifacts ("Rebuild the free-text search index"), and on a fresh account no run exists until step 10. This order doesn't handle that yet.
 
 5. Build and push both images, each with a new tag:
 

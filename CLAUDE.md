@@ -7,9 +7,24 @@ read the relevant `T#.#` block before starting work.
 - One `T#.#` task per session. Stop when that task's **Done when** command
   passes. Do not begin the next task.
 - Do not start a task whose **Depends on** is not yet committed.
-- If the real data disagrees with the guide (missing column, different
-  count), update the guide in the same commit and add today's line to §7.
+- If reality disagrees with the guide in a way that changes the plan, update
+  the guide in the same commit and add ONE short line to §7 (see below).
   Do not work around it silently.
+
+## §7 deviations log (added 2026-11-25)
+§7 is for major changes only. Write a §7 line when:
+- a decision, task, scope, order or non-goal in the spec changes;
+- a rule or constraint changes (dependency pins policy, the API import
+  guard, naming, a CLAUDE.md rule);
+- the real data or the live system disagrees with what the spec assumed
+  (counts, columns, cost, limits) and that changes what we do next.
+Not §7 (put these in HANDOFF_V3.md "Task notes" instead, as the task's
+row or a short subsection; raw output goes in the gitignored notes/):
+measurements, timings, sizes, digests, tags, ECR totals, test counts,
+file lists, commands run, and clarifications that don't change the spec.
+Format: at most one line per task, at most 3 sentences: date, task, what
+changed, why, and where the details are ("numbers in HANDOFF T6.5").
+If unsure whether something is major, ask me instead of writing it.
 
 ## Hard constraint
 `document` = title + tagline + overview + genres. **Never add keywords.**

@@ -16,6 +16,8 @@ The first run takes about 64 s, because it downloads the Python packages and ~12
 
 Open <http://localhost:8000> and try the examples and the "Match by" toggle. Ctrl+C stops the server. The demo catalog is the 5,000 most-voted films.
 
+To search by description, switch to "Describe a movie" and type a few words, such as "dream heist", to get 10 films whose text matches.
+
 ### Run the tests
 
 ```bash
@@ -88,4 +90,4 @@ The data comes from [Full TMDB Movies Dataset 2024 (1M Movies)](https://www.kagg
 
 ---
 
-Next: free-text search and collaborative filtering (v3)
+Next: collaborative filtering (v3)

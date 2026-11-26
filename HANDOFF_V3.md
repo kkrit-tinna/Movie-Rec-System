@@ -51,16 +51,15 @@ Full history: v2's `IMPLEMENTATION.md` §9 (in git history) and the runbook.
 
 ## Where I am right now
 
-*Last updated: 2026-11-24*
+*Last updated: 2026-11-25*
 
-**Status:** Phase 5 done (T5.1 `c4ca9aa`, T5.2 `433e17e`). T6.1 chose option (A),
-scikit-learn + scipy in the API image (`3d31810`). T6.2's search index and scorer are
-committed (`80b106e`), built from run 2026-11-22. T6.4 (API endpoint and page) is done
-but uncommitted until `feat: free-text-search-api`; its image `movierec-api:dev` is
-built locally only. Nothing new is live: the site still serves `t4.5-2026-10-26`.
+**Status:** Free-text search is live. The site serves `movierec-api:t6.5-2026-11-25`
+(`sha256:f185deb1…5ab3`) with the run 2026-11-22 search index, and "Describe a movie"
+works on the page. Phase 5 is done (T5.1 `c4ca9aa`, T5.2 `433e17e`). T6.1 `3d31810`,
+T6.2 `80b106e` and T6.4 `cf789c2` are committed. T6.5 is committed. ECR stores 444.6 of 500 MB.
 
-**Next:** T6.5 (deploy and document), in week 2 (Nov 23–29). Measure the ECR total
-before the push (margin ~12.8 MB, §7 T6.1). T6.3 (evaluation) still comes after T6.5.
+**Next:** T6.3 (evaluation), Nov 30 – Dec 1. Then the analysis of the manual evaluation
+(below).
 
 **Also in week 2 (not a spec task):** the manual evaluation of v2's recommendations is
 finished; analyze it and add the findings to "Evaluation feedback" below (finding 2
@@ -83,7 +82,7 @@ moves after T6.5 (Nov 30 – Dec 1).
 | T6.2 Search index + scorer | Done | 80b106e | Index run_date: **2026-11-22**. Option (A): `artifacts/api/search_index.{joblib,npz,json}` (1.98 MB + 25.6 MB + 0.50 MB). 282 tests pass; 5/5 run-D queries match the sklearn reference top 10 (§7) |
 | T6.3 Evaluation | | | P@10 vs random: |
 | T6.4 API + page | Done | feat: free-text-search-api | `GET /api/query?q=` + "Describe a movie" mode. Local image (not pushed): 172,493,512 B (172.5 MB ≤ 185.3), `sha256:0657d4da68fce4a0724f70b3dd0aca7d6afd73fcb87643b298de51e1805e63f1`, freeze = `constraints/api.txt` (§7). Clean-copy `make demo` check passed ("dream heist" → 10, "zzqx" and empty query → reasons, `/api/similar/27205` OK, page modes / no-match / card click OK) |
-| T6.5 Deploy | | | Live tag / digest: |
+| T6.5 Deploy | Done | feat: free-text-search-live | Live tag / digest: **`t6.5-2026-11-25`** / `sha256:f185deb1493f4698a79a194a96eee546669b02d031dae13b9de0dde4f6935ab3`. ECR 314.7 → 444.6 MB. Warm queries 0.12–0.13 s, 10 results each; first cold start after the deploy returned 502 (init > 10 s twice); the next cold start took 4.16 s, 374 MB (§7) |
 
 ### T6.2 run-D top 10 (equal to the sklearn reference, 5/5)
 
@@ -135,6 +134,13 @@ over all rows. Rule: (A) if size ≤ 185.3 MB and median cold load ≤ 3 s. Both
   unique storage, so they were left in place at T5.2 (§7).
 - `notes/ecr_usage.py` (gitignored) measures ECR stored bytes. The spec checks the ECR
   total before every push, so consider moving it to `scripts/` before T6.5.
+- **Cold start is now about 4.2 s** (Init Duration 4,156.93 ms on 2026-11-25), up from about
+  1.9 s before scikit-learn and the search index joined the API image. That is 42% of
+  Lambda's 10 s init limit.
+- **The first cold start after each deploy can return a 502.** After the t6.5 deploy,
+  init ran past 10 s twice and the first request failed after 20.6 s (likely the uncached
+  image; not proven). After every apply, request `/api/health` until it returns 200
+  (runbook §6).
 
 ## Evaluation feedback
 
@@ -178,6 +184,9 @@ Free-text search reuses this TF-IDF representation and forbids reranking
 ## Spend
 
 - T5.2: $0 (read and delete calls are free); ECR storage down 69.9 MB.
+- T6.5: ~$0. ECR storage up 129.9 MB to 444.6 MB, still inside the 500 MB free allowance.
+  The checks' Lambda invocations (including two 10 s timeouts) and CloudWatch Logs reads
+  are within the free tier.
 
 ## For the runbook
 
